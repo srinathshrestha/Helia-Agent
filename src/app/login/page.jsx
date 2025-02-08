@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from '@supabase/ssr';
-import { Eye, EyeOff, Loader2, Mail, Lock, Chrome, Apple, ArrowLeft, X } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Mail, Lock, ArrowLeft, X } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
+import SocialAuth from "@/components/auth/social-auth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -89,25 +91,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleSocialSignIn = async (provider) => {
-    setIsLoading(true);
-    setErrors({});
-
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: provider.toLowerCase(),
-        options: {
-          redirectTo: `${location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) throw error;
-    } catch (error) {
-      setErrors({ general: `Failed to sign in with ${provider}: ${error.message}` });
-      setIsLoading(false);
-    }
-  };
-
   const handleSignUp = async (e) => {
     e.preventDefault();
     setErrors({});
@@ -166,108 +149,75 @@ export default function LoginPage() {
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* Social Login Buttons */}
-          <div className="flex gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1 bg-transparent text-white hover:bg-white/10 border-gray-700"
-              onClick={() => handleSocialSignIn('Google')}
-              disabled={isLoading}
-            >
-              <Chrome className="mr-2 h-4 w-4" />
-              Google
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1 bg-transparent text-white hover:bg-white/10 border-gray-700"
-              onClick={() => handleSocialSignIn('Apple')}
-              disabled={isLoading}
-            >
-              <Apple className="mr-2 h-4 w-4" />
-              Apple
-            </Button>
-          </div>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-gray-700" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="bg-gray-800/50 px-2 text-gray-400">Or continue with email</span>
-            </div>
-          </div>
-
           <form onSubmit={handleSignIn} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-gray-300">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-2.5 h-5 w-5 text-gray-500" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (errors.email) {
-                      setErrors(prev => ({ ...prev, email: undefined }));
-                    }
-                  }}
-                  className={cn(
-                    "pl-10 bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-500",
-                    "focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all",
-                    errors.email && "border-red-500 focus:ring-red-500/50"
-                  )}
-                  autoFocus={autoFocus}
-                  required
-                />
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="email" className="text-gray-300">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-2.5 h-5 w-5 text-gray-500" />
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (errors.email) {
+                        setErrors(prev => ({ ...prev, email: undefined }));
+                      }
+                    }}
+                    className={cn(
+                      "pl-10 bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-500",
+                      "focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all",
+                      errors.email && "border-red-500 focus:ring-red-500/50"
+                    )}
+                    autoFocus={autoFocus}
+                    required
+                  />
+                </div>
+                {errors.email && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <X className="h-4 w-4" /> {errors.email}
+                  </p>
+                )}
               </div>
-              {errors.email && (
-                <p className="text-sm text-red-500 flex items-center gap-1">
-                  <X className="h-4 w-4" /> {errors.email}
-                </p>
-              )}
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-gray-300">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-2.5 h-5 w-5 text-gray-500" />
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (errors.password) {
-                      setErrors(prev => ({ ...prev, password: undefined }));
-                    }
-                  }}
-                  className={cn(
-                    "pl-10 pr-10 bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-500",
-                    "focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all",
-                    errors.password && "border-red-500 focus:ring-red-500/50"
-                  )}
-                  required
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-1 top-1 h-8 w-8 p-0 text-gray-500 hover:text-white"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
+              <div>
+                <Label htmlFor="password" className="text-gray-300">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-2.5 h-5 w-5 text-gray-500" />
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (errors.password) {
+                        setErrors(prev => ({ ...prev, password: undefined }));
+                      }
+                    }}
+                    className={cn(
+                      "pl-10 pr-10 bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-500",
+                      "focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all",
+                      errors.password && "border-red-500 focus:ring-red-500/50"
+                    )}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1 h-8 w-8 p-0 text-gray-500 hover:text-white"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                {errors.password && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <X className="h-4 w-4" /> {errors.password}
+                  </p>
+                )}
               </div>
-              {errors.password && (
-                <p className="text-sm text-red-500 flex items-center gap-1">
-                  <X className="h-4 w-4" /> {errors.password}
-                </p>
-              )}
             </div>
 
             <div className="flex items-center justify-between">
@@ -275,24 +225,14 @@ export default function LoginPage() {
                 <Checkbox
                   id="remember"
                   checked={rememberMe}
-                  onCheckedChange={setRememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked)}
                   className="border-gray-700 data-[state=checked]:bg-primary"
                 />
-                <Label
-                  htmlFor="remember"
-                  className="text-sm text-gray-400 cursor-pointer select-none"
-                >
-                  Remember me
-                </Label>
+                <Label htmlFor="remember" className="text-sm">Remember me</Label>
               </div>
-              <Button
-                type="button"
-                variant="link"
-                className="text-sm text-primary hover:text-primary/90 px-0"
-                onClick={() => router.push('/forgot-password')}
-              >
+              <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
                 Forgot password?
-              </Button>
+              </Link>
             </div>
 
             {errors.general && (
@@ -316,6 +256,26 @@ export default function LoginPage() {
                 'Sign in'
               )}
             </Button>
+
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+
+            <SocialAuth onSuccess={() => router.push('/chat')} />
+
+            <p className="text-center text-sm text-gray-600">
+              Don't have an account?{' '}
+              <Link href="/signup" className="text-blue-600 hover:underline">
+                Create one now
+              </Link>
+            </p>
           </form>
         </CardContent>
 

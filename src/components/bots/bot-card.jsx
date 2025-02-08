@@ -1,9 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { Shield, Sprout, Sun, Sunrise, ArrowRight } from "lucide-react";
+import { Shield, Sprout, Sun, Sunrise, ArrowRight, Loader2 } from "lucide-react";
 
 const icons = {
   shield: Shield,
@@ -15,6 +16,12 @@ const icons = {
 export function BotCard({ name, description, icon, color }) {
   const router = useRouter();
   const Icon = icons[icon];
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleChatClick = async () => {
+    setIsLoading(true);
+    router.push(`/chat/${name.toLowerCase().replace(/\s+/g, '-')}`);
+  };
 
   return (
     <Card className="relative overflow-hidden transition-all hover:shadow-lg">
@@ -28,10 +35,20 @@ export function BotCard({ name, description, icon, color }) {
       <CardContent>
         <Button 
           className="w-full"
-          onClick={() => router.push(`/chat/${name.toLowerCase().replace(/\s+/g, '-')}`)}
+          onClick={handleChatClick}
+          disabled={isLoading}
         >
-          Chat Now
-          <ArrowRight className="ml-2 h-4 w-4" />
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading...
+            </>
+          ) : (
+            <>
+              Chat Now
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </>
+          )}
         </Button>
       </CardContent>
     </Card>

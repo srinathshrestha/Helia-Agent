@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useSupabase } from '@/lib/hooks/use-supabase';
 import { generateResponse } from '@/lib/gemini';
+import { updateCredits } from '@/lib/credits';
 
 export default function ChatInterface({ botId, botPrompt }) {
   const supabase = useSupabase();
@@ -59,15 +60,35 @@ export default function ChatInterface({ botId, botPrompt }) {
 
       if (error) throw error;
 
-      setCredits(userData.credits);
+      // Update the credits in the database if they are negative
+      if (userData.credits < 0) {
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('users')
+          .update({ credits: 0 })
+          .eq('id', userId)
+          .select('credits')
+          .single();
+          
+        if (!updateError) {
+          setCredits(0);
+        } else {
+          console.error('Error updating negative credits:', updateError);
+        }
+      } else {
+        setCredits(userData.credits);
+      }
+      
       setIsSubscribed(userData.is_subscribed);
     } catch (error) {
       console.error('Error fetching user data:', error);
     }
   };
 
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+
   const fetchMessages = async (userId) => {
     try {
+      setIsInitialLoading(true);
       const { data, error } = await supabase
         .from('chats')
         .select('*')
@@ -79,6 +100,8 @@ export default function ChatInterface({ botId, botPrompt }) {
       setMessages(data || []);
     } catch (error) {
       console.error('Error fetching messages:', error);
+    } finally {
+      setIsInitialLoading(false);
     }
   };
 
@@ -128,15 +151,8 @@ export default function ChatInterface({ botId, botPrompt }) {
       });
 
       if (!isSubscribed) {
-        const { data: updatedUser, error: creditError } = await supabase
-          .from('users')
-          .update({ credits: credits - Math.ceil(tokens * 0.1) })
-          .eq('id', session.user.id)
-          .select('credits')
-          .single();
-
-        if (creditError) throw creditError;
-        setCredits(updatedUser.credits);
+        const newCredits = await updateCredits(session.user.id, tokens);
+        setCredits(newCredits);
       }
 
       const { error: botInsertError } = await supabase
@@ -171,8 +187,17 @@ export default function ChatInterface({ botId, botPrompt }) {
   };
 
   return (
-    <div className="flex flex-col h-screen max-h-screen">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex flex-col h-screen max-h-screen relative">
+      <div className="flex-1 overflow-y-auto p-2 md:p-4 space-y-4">
+        {isInitialLoading && (
+          <div className="flex flex-col items-center justify-center h-[calc(100vh-8rem)] space-y-4">
+            <div className="relative">
+              <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              <div className="absolute -top-1 -right-1 h-3 w-3 border-2 border-primary border-t-transparent rounded-full animate-spin [animation-delay:0.2s]" />
+            </div>
+            <p className="text-sm text-muted-foreground animate-pulse">Loading messages...</p>
+          </div>
+        )}
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -181,7 +206,7 @@ export default function ChatInterface({ botId, botPrompt }) {
             }`}
           >
             <div
-              className={`rounded-lg px-4 py-2 max-w-[80%] ${
+              className={`rounded-lg px-4 py-2 max-w-[80%] animate-fade-in ${
                 msg.role === 'user'
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted'
@@ -221,7 +246,7 @@ export default function ChatInterface({ botId, botPrompt }) {
         
         {streamingMessage && (
           <div className="flex justify-start">
-            <div className="rounded-lg px-4 py-2 max-w-[80%] bg-muted">
+            <div className="rounded-lg px-4 py-2 max-w-[80%] bg-muted animate-fade-in">
               <ReactMarkdown 
                 remarkPlugins={[remarkGfm]}
                 className="prose prose-invert prose-sm"
@@ -248,6 +273,11 @@ export default function ChatInterface({ botId, botPrompt }) {
               >
                 {streamingMessage}
               </ReactMarkdown>
+              <div className="mt-2 flex items-center gap-1">
+                <div className="h-1.5 w-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
+                <div className="h-1.5 w-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
+                <div className="h-1.5 w-1.5 bg-primary rounded-full animate-bounce" />
+              </div>
             </div>
           </div>
         )}
@@ -255,21 +285,28 @@ export default function ChatInterface({ botId, botPrompt }) {
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="p-4 border-t">
-        <div className="flex gap-2">
+      <form onSubmit={handleSubmit} className="sticky bottom-0 bg-background/80 backdrop-blur-sm p-2 md:p-4 border-t">
+        <div className="flex gap-2 max-w-4xl mx-auto">
           <input
             type="text"
             name="message"
-            placeholder="Type your message..."
-            className="flex-1 rounded-md bg-background px-4 py-2 border"
+            placeholder={isLoading ? 'AI is thinking...' : 'Type your message...'}
+            className="flex-1 rounded-md bg-background/50 backdrop-blur-sm px-4 py-2 border shadow-sm transition-all duration-200 focus:bg-background focus:shadow-md"
             disabled={!session || isLoading}
           />
           <button
             type="submit"
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md disabled:opacity-50"
+            className="px-3 md:px-4 py-2 bg-primary text-primary-foreground rounded-md disabled:opacity-50 transition-all duration-200 flex items-center gap-2 min-w-[40px] md:min-w-[80px] justify-center shadow-sm hover:shadow-md active:scale-95"
             disabled={!session || isLoading}
           >
-            Send
+            {isLoading ? (
+              <>
+                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Thinking</span>
+              </>
+            ) : (
+              'Send'
+            )}
           </button>
         </div>
       </form>

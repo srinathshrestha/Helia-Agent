@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, use } from 'react';
+import { useEffect, use, Suspense, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabase } from '@/lib/hooks/use-supabase';
 import ChatClient from './chat-client';
 import Sidebar from '@/components/layout/sidebar';
+import { LoadingTransition } from '@/components/ui/loading-transition';
 
 const bots = {
   "helia-sun-shield": {
@@ -30,18 +31,24 @@ export default function ChatPage({ params }) {
   const supabase = useSupabase();
   const resolvedParams = use(params);
   const { botId } = resolvedParams;
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/');
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          router.push('/');
+        }
+      } finally {
+        setIsLoading(false);
       }
     };
     checkSession();
   }, [supabase.auth, router]);
 
   const handleSignOut = async () => {
+    setIsLoading(true);
     await supabase.auth.signOut();
     router.push('/');
   };
@@ -50,12 +57,15 @@ export default function ChatPage({ params }) {
     return <div>Bot not found</div>;
   }
 
+  if (isLoading) {
+    return <LoadingTransition />;
+  }
+
   return (
-    <div className="flex min-h-screen bg-gray-900">
-      <Sidebar onSignOut={handleSignOut} />
-      <div className="flex-1">
+    <div className="flex-1 bg-gray-900">
+      <Suspense fallback={<LoadingTransition />}>
         <ChatClient botId={botId} botInfo={bots[botId]} />
-      </div>
+      </Suspense>
     </div>
   );
 }

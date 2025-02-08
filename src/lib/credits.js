@@ -1,6 +1,6 @@
 import { createBrowserClient } from '@supabase/ssr';
 
-// Cost per token in credits
+// Cost per token in credits (1 credit per 10 tokens)
 const CREDITS_PER_TOKEN = 0.1;
 
 export async function updateCredits(userId, tokensUsed) {
@@ -9,7 +9,8 @@ export async function updateCredits(userId, tokensUsed) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
 
-  const creditsToDeduct = Math.ceil(tokensUsed * CREDITS_PER_TOKEN);
+  // Calculate credits to deduct - always deduct 1 credit per 10 tokens
+  const creditsToDeduct = Math.max(1, Math.floor(tokensUsed * CREDITS_PER_TOKEN));
 
   // Get current credits
   const { data: userData, error: fetchError } = await supabase
@@ -25,15 +26,18 @@ export async function updateCredits(userId, tokensUsed) {
     throw new Error('Insufficient credits');
   }
 
+  // Ensure credits never go negative
+  const newCredits = Math.max(0, currentCredits - creditsToDeduct);
+
   // Update credits
   const { error: updateError } = await supabase
     .from('users')
-    .update({ credits: currentCredits - creditsToDeduct })
+    .update({ credits: newCredits })
     .eq('id', userId);
 
   if (updateError) throw updateError;
 
-  return currentCredits - creditsToDeduct;
+  return newCredits;
 }
 
 export async function getUserCredits(userId) {

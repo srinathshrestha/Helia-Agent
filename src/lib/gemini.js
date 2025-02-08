@@ -8,9 +8,16 @@ const RETRY_DELAY = 1000; // 1 second
 
 // Estimate tokens before making the API call
 export function estimateTokens(text) {
-  // A very rough estimation: ~4 characters per token
-  // This is a simplified estimate and may not match exactly with Gemini's tokenization
-  return Math.ceil(text.length / 4);
+  // Ensure text is a string and handle empty/null cases
+  if (!text) return 1;
+  const textStr = String(text);
+  
+  // Count words and special characters
+  const words = textStr.trim().split(/\s+/).length;
+  const specialChars = textStr.replace(/[\w\s]/g, '').length;
+  
+  // Estimate: 1.3 tokens per word (average) + 1 token per special character
+  return Math.max(1, Math.floor(words * 1.3 + specialChars));
 }
 
 async function delay(ms) {

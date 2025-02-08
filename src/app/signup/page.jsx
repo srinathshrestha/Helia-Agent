@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from '@supabase/ssr';
 import { Eye, EyeOff, Loader2, Mail, Lock, User, ArrowLeft, Check, X } from 'lucide-react';
@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
+import SocialAuth from "@/components/auth/social-auth";
 
 const commonEmailDomains = ['@gmail.com', '@yahoo.com', '@outlook.com', '@hotmail.com'];
 
@@ -33,18 +35,18 @@ export default function SignUpPage() {
   );
 
   const getPasswordStrength = (password) => {
-    if (!password) return { strength: 'none', color: 'bg-gray-200' };
-    if (password.length < 8) return { strength: 'Too Short', color: 'bg-red-500' };
+    if (!password) return { strength: '', color: '' };
+    if (password.length < 8) return { strength: 'Weak', color: 'bg-red-500' };
     
-    let score = 0;
-    if (password.length >= 12) score += 1;
-    if (password.match(/[0-9]/)) score += 1;
-    if (password.match(/[a-z]/)) score += 1;
-    if (password.match(/[A-Z]/)) score += 1;
-    if (password.match(/[^a-zA-Z0-9]/)) score += 1;
-
-    if (score < 2) return { strength: 'Weak', color: 'bg-red-500' };
-    if (score < 4) return { strength: 'Medium', color: 'bg-yellow-500' };
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    
+    const strength = [hasUpperCase, hasLowerCase, hasNumbers, hasSpecialChar].filter(Boolean).length;
+    
+    if (strength <= 2) return { strength: 'Weak', color: 'bg-red-500' };
+    if (strength === 3) return { strength: 'Medium', color: 'bg-yellow-500' };
     return { strength: 'Strong', color: 'bg-green-500' };
   };
 
@@ -95,7 +97,10 @@ export default function SignUpPage() {
 
   const handleSignUp = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    
+    if (!validateForm()) {
+      return;
+    }
 
     setIsLoading(true);
     setErrors({});
@@ -109,9 +114,10 @@ export default function SignUpPage() {
         }
       });
 
-      // If there's no error, it means the email exists
       if (!checkError) {
-        setErrors({ email: 'This email is already registered. Please sign in instead.' });
+        setErrors({
+          email: 'This email is already registered. Please sign in instead.',
+        });
         setIsLoading(false);
         return;
       }
@@ -129,27 +135,38 @@ export default function SignUpPage() {
       });
 
       if (signUpError) {
-        if (signUpError.message.includes('already registered')) {
-          setErrors({ email: 'This email is already registered. Please sign in instead.' });
-        } else {
-          throw signUpError;
-        }
-        return;
+        throw signUpError;
+      }
+
+      // Send welcome email
+      const response = await fetch('/api/send-welcome-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          fullName: formData.fullName,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to send welcome email');
       }
 
       setErrors({
-        success: "Please check your email for the confirmation link."
+        success: 'Please check your email for the confirmation link.',
       });
-      
+
+      // Don't redirect immediately, let user see the success message
+      setTimeout(() => {
+        router.push('/login');
+      }, 5000);
+
     } catch (error) {
-      console.error('Signup error:', error);
-      if (error.message?.includes('already registered') || error.message?.includes('already exists')) {
-        setErrors({ email: 'This email is already registered. Please sign in instead.' });
-      } else {
-        setErrors({
-          general: error.message || 'Failed to create account. Please try again.'
-        });
-      }
+      setErrors({
+        general: error.message || 'An error occurred during sign up.',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -160,9 +177,9 @@ export default function SignUpPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
       <Button
+        type="button"
         variant="ghost"
-        size="sm"
-        className="absolute top-4 left-4 text-gray-400 hover:text-white"
+        className="absolute left-4 top-4 text-gray-400 hover:text-white"
         onClick={() => router.push('/')}
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
@@ -354,12 +371,25 @@ export default function SignUpPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Account...
+                  Creating account...
                 </>
               ) : (
-                'Create Account'
+                'Create account'
               )}
             </Button>
+
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-gray-700" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-gray-800/50 px-2 text-gray-400">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+
+            <SocialAuth onSuccess={() => router.push('/chat')} />
           </form>
         </CardContent>
 
